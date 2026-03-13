@@ -249,7 +249,7 @@ export function cosineSimilarity(
   console.log('  Flight pattern (Pearson):', flightPatternScore.toFixed(3), '→ normalized:', fpNorm.toFixed(3));
   console.log('  Hold ratio score:', holdRatioScore.toFixed(3));
   console.log('  Duration score:', durScore.toFixed(3));
-  console.log('  FINAL SCORE:', score.toFixed(3));
+  console.log('  FINAL SCORE:', score.toFixed(3), '→ CLASSIFICATION:', classifyScore(score));
   console.log('  Live holdTimes:', liveK.holdTimes?.slice(0,5).map(n=>n.toFixed(0)));
   console.log('  Enroll holdTimes:', enrollK.holdTimes?.slice(0,5).map(n=>n.toFixed(0)));
   console.log('  Live flightTimes:', liveK.flightTimes?.slice(0,5).map(n=>n.toFixed(0)));
@@ -266,9 +266,9 @@ export function detectStress(liveK, enrollK) {
 }
 
 export function classifyScore(score) {
-  // Use a slightly lower authentication threshold so real users are not pushed into duress
-  if (score > 0.75) return 'authenticated';
-  if (score >= 0.55) return 'duress';
+  // More balanced thresholds to reduce false positives and enable rejections
+  if (score > 0.70) return 'authenticated';
+  if (score >= 0.60) return 'duress';
   return 'rejected';
 }
 

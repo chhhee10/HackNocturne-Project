@@ -159,8 +159,8 @@ export default function Auth() {
   };
 
   const scoreColor = score === null ? '#fff'
-    : score > 0.75 ? '#00ff88'
-    : score >= 0.55 ? '#ffaa00'
+    : score > 0.70 ? '#00ff88'
+    : score >= 0.60 ? '#ffaa00'
     : '#ff4444';
 
   const resultMessages = {
@@ -241,8 +241,8 @@ export default function Auth() {
               {/* Score bar */}
               <div style={styles.barContainer}>
                 <div style={{ ...styles.bar, width: `${(score || 0) * 100}%`, background: scoreColor, transition: 'width 0.05s ease' }} />
-                <div style={{ ...styles.barMarker, left: '55%' }} title="Duress threshold" />
-                <div style={{ ...styles.barMarker, left: '85%', borderColor: '#00ff88' }} title="Auth threshold" />
+                <div style={{ ...styles.barMarker, left: '60%' }} title="Duress threshold" />
+                <div style={{ ...styles.barMarker, left: '70%', borderColor: '#00ff88' }} title="Auth threshold" />
               </div>
               <div style={styles.barLabels}>
                 <span style={{ color: '#ff4444' }}>REJECTED</span>
