@@ -15,24 +15,24 @@ export default function App() {
 
   const [loading, setLoading] = useState(true);
 
-  if (loading) {
-    return <HexLoader onFinish={() => setLoading(false)} />;
-  }
-
   return (
     <VaultlessProvider>
       <BrowserRouter>
 
+        {/* PAGE ALWAYS RENDERED */}
         <Routes>
-
           <Route path="/" element={<Landing />} />
           <Route path="/gmail" element={<Gmail />} />
           <Route path="/enroll" element={<Enroll />} />
           <Route path="/auth" element={<Auth />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/ghost" element={<Ghost />} />
-
         </Routes>
+
+        {/* LOADER OVERLAY */}
+        {loading && (
+          <HexLoader onFinish={() => setLoading(false)} />
+        )}
 
       </BrowserRouter>
     </VaultlessProvider>

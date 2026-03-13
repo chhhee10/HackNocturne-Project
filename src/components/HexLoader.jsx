@@ -4,24 +4,46 @@ import { useEffect } from "react";
 export default function HexLoader({ onFinish }) {
 
   useEffect(() => {
-
     const timer = setTimeout(() => {
       onFinish();
     }, 1500);
 
     return () => clearTimeout(timer);
-
-  }, []);
+  }, [onFinish]);
 
   return (
     <div style={styles.container}>
 
-      <motion.div
-        initial={{ scale: 0.2, opacity: 0 }}
-        animate={{ scale: 1.8, opacity: 1 }}
-        transition={{ duration: 1.2, ease: "easeOut" }}
+      <motion.svg
+        width="140"
+        height="140"
+        viewBox="0 0 100 100"
         style={styles.hex}
-      />
+
+        initial={{
+          scale: 0.1,
+          opacity: 1
+        }}
+
+        animate={{
+          scale: 30,
+          opacity: 0   // fades away while zooming
+        }}
+
+        transition={{
+          duration: 1.5,
+          ease: "easeInOut"
+        }}
+      >
+
+        <polygon
+          points="50,3 95,25 95,75 50,97 5,75 5,25"
+          fill="transparent"
+          stroke="#00cc66"
+          strokeWidth="5"
+        />
+
+      </motion.svg>
 
     </div>
   );
@@ -32,20 +54,16 @@ const styles = {
   container: {
     position: "fixed",
     inset: 0,
-    background: "#000",
+    background: "transparent",
     display: "flex",
     justifyContent: "center",
     alignItems: "center",
+    overflow: "hidden",
     zIndex: 9999
   },
 
   hex: {
-    width: 120,
-    height: 120,
-    background: "#00ff88",
-    clipPath:
-      "polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0% 50%)",
-    boxShadow: "0 0 40px #00ff88"
+    filter: "drop-shadow(0 0 20px #00cc66)"
   }
 
 };
