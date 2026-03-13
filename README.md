@@ -202,6 +202,7 @@ Stress detection currently triggers when live rhythm variance exceeds about `2.5
 
 When there is enough mobile interaction data in both enrollment and live sessions, the engine can also factor in touch and motion-related signals to strengthen authentication on touch devices.
 
+
 ## Duress Protocol
 
 If the typing pattern looks close enough to be plausible but also carries a stress signal, VAULTLESS:
