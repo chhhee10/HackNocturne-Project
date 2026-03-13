@@ -1,12 +1,12 @@
 # VAULTLESS
 
-Behavioural authentication prototype for desktop and touch devices that uses multiple behavioural signals, including typing rhythm, mouse dynamics, touch interaction, and stress indicators, as a password substitute, with authentication events anchored to an Ethereum Sepolia smart contract.
+Behavioural authentication prototype for desktop and touch devices that uses multiple behavioural signals, including typing rhythm, mouse dynamics, touch interaction, device motion, and stress indicators, as a password substitute, with authentication events anchored to an Ethereum Sepolia smart contract.
 
 ## Why We Are Building This
 
 Digital security still depends too heavily on secrets that can be stolen, guessed, phished, leaked, or coerced out of people. Passwords, OTPs, and even many forms of 2FA often fail at the exact moment a person is under pressure.
 
-VAULTLESS is being built to explore a safer model: authentication based on how a person naturally behaves, not just what they know. Instead of trusting a static secret, the system looks at behavioural patterns such as typing rhythm, mouse movement, and touch behaviour on mobile devices, then uses that signal to make authentication harder to fake and easier to adapt under real-world conditions.
+VAULTLESS is being built to explore a safer model: authentication based on how a person naturally behaves, not just what they know. Instead of trusting a static secret, the system looks at behavioural patterns such as typing rhythm, mouse movement, touch behaviour on mobile devices, and motion signals from supported phones, then uses that signal to make authentication harder to fake and easier to adapt under real-world conditions.
 
 This matters socially because account compromise is not just a technical inconvenience. It affects:
 
@@ -34,6 +34,7 @@ VAULTLESS replaces static credentials with a behavioural profile built from:
 - Keystroke timing
 - Mouse movement patterns
 - Touch movement and touch pressure on supported devices
+- Device motion signals such as gyroscope and accelerometer activity
 - Stress and rhythm variance signals
 
 This makes VAULTLESS a multi-platform authentication system that can adapt to both desktop and mobile usage instead of relying on a single input signal.
@@ -50,10 +51,10 @@ The app guides a user through enrollment, compares live behaviour during authent
 2. Enroll by typing `Secure my account` three times.
 3. The client averages those samples into a behavioural vector.
 4. A commitment hash is registered on the Sepolia contract.
-5. During authentication, a fresh behavioural sample is compared against the enrolled baseline.
+5. During authentication, a fresh behavioural sample is compared against the enrolled baseline using weighted similarity checks across the available signals.
 6. The app logs `AuthSuccess`, `AuthFailed`, or `DuressActivated`.
 
-On touch-capable devices, enrollment and authentication can also capture touch gestures and pressure data, with optional motion/sensor support where the browser and device allow it.
+On touch-capable devices, enrollment and authentication can also capture touch gestures, touch pressure, and optional motion/sensor data where the browser, device, and permissions allow it.
 
 ## Routes
 
@@ -66,6 +67,8 @@ On touch-capable devices, enrollment and authentication can also capture touch g
 | `/dashboard` | Authenticated session with chain event panel |
 | `/ghost` | Decoy session shown during duress |
 
+Unknown routes redirect back to `/`.
+
 ## Tech Stack
 
 - React 18
@@ -77,6 +80,7 @@ On touch-capable devices, enrollment and authentication can also capture touch g
 - Solidity 0.8.20
 - EmailJS for duress alerts
 - Touch and motion-aware mobile interaction capture
+- Browser device sensor APIs where available
 
 ## Project Structure
 
@@ -144,6 +148,7 @@ VITE_EMAILJS_SERVICE_ID=
 VITE_EMAILJS_TEMPLATE_ID=
 VITE_EMAILJS_PUBLIC_KEY=
 VITE_ALERT_EMAIL=alert@example.com
+VITE_SHOW_SENSOR_DEBUG=false
 ```
 
 ### Modes
@@ -159,6 +164,13 @@ VITE_ALERT_EMAIL=alert@example.com
 - Requires MetaMask
 - Requires Sepolia contract deployment
 - Uses real contract calls for register/auth/duress events
+
+### Mobile Sensor Notes
+
+- Motion/orientation capture may require an explicit permission prompt.
+- Some browsers only allow sensor access in a secure context, such as HTTPS.
+- On unsupported or blocked devices, VAULTLESS still works with the remaining signals instead of failing completely.
+- `VITE_SHOW_SENSOR_DEBUG=true` enables extra live debugging graphs during enrollment.
 
 ## Smart Contract
 
@@ -191,6 +203,7 @@ It currently uses a mix of:
 - mouse movement and click behavior
 - touch movement and touch pressure on mobile devices
 - optional motion/sensor-derived signals when supported
+- weighted score fusion so keystrokes remain dominant while secondary signals add confidence
 
 Current decision rules in code:
 
@@ -200,7 +213,12 @@ Current decision rules in code:
 
 Stress detection currently triggers when live rhythm variance exceeds about `2.5x` the enrollment baseline.
 
-When there is enough mobile interaction data in both enrollment and live sessions, the engine can also factor in touch and motion-related signals to strengthen authentication on touch devices.
+Current scoring behavior:
+
+- keystroke similarity is the dominant signal
+- mouse and gesture behaviour is blended in when enrollment data exists
+- touch pressure and motion features contribute on mobile when enough data is available
+- the engine falls back gracefully when a device cannot provide every signal
 
 
 ## Duress Protocol
@@ -222,6 +240,7 @@ That includes:
 - enrollment vector
 - averaged keystroke profile
 - averaged mouse profile
+- touch and motion-derived enrollment summaries when available
 - wallet address
 - enrollment status
 
