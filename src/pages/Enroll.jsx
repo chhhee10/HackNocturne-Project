@@ -426,16 +426,18 @@ export default function Enroll() {
             <div style={styles.phrase}>"{PHRASE}"</div>
             <p style={styles.hint}>Press Enter when done</p>
 
-            {showMobileSensorUi && <div style={styles.sensorInfoCard}>
-              <div style={styles.sensorInfoText}>
-                Motion Sensors: <span style={{ color: sensorsEnabled ? '#00ff88' : '#ffb366' }}>{sensorsEnabled ? 'Enabled' : 'Optional'}</span>
-              </div>
-              {!sensorsEnabled && (
-                <div style={styles.sensorInfoSubtext}>
-                  Enable for stronger mobile protection.
+            {showMobileSensorUi && (
+              <div style={styles.sensorInfoCard}>
+                <div style={styles.sensorInfoText}>
+                  Motion Sensors: <span style={{ color: sensorsEnabled ? '#00ff88' : '#ffb366' }}>{sensorsEnabled ? 'Enabled' : 'Optional'}</span>
                 </div>
-              )}
-            </div>}
+                {!sensorsEnabled && (
+                  <div style={styles.sensorInfoSubtext}>
+                    Enable for stronger mobile protection.
+                  </div>
+                )}
+              </div>
+            )}
 
             {showMobileSensorUi && showEnableSensors && (
               <div style={styles.sensorActionBox}>
@@ -535,21 +537,23 @@ export default function Enroll() {
               </div>
             )}
 
-            {showMobileSensorUi && <div style={styles.sensorMiniCard}>
-              <div style={styles.sensorMiniTitle}>SENSOR STATUS</div>
-              <div style={styles.sensorMiniRow}>
-                <span style={styles.sensorMiniKey}>Health</span>
-                <span style={styles.sensorMiniVal}>{sensorHealthText}</span>
+            {showMobileSensorUi && (
+              <div style={styles.sensorMiniCard}>
+                <div style={styles.sensorMiniTitle}>SENSOR STATUS</div>
+                <div style={styles.sensorMiniRow}>
+                  <span style={styles.sensorMiniKey}>Health</span>
+                  <span style={styles.sensorMiniVal}>{sensorHealthText}</span>
+                </div>
+                <div style={styles.sensorMiniRow}>
+                  <span style={styles.sensorMiniKey}>Permissions</span>
+                  <span style={styles.sensorMiniVal}>{sensorsEnabled ? 'Granted' : 'Not granted'}</span>
+                </div>
+                <div style={styles.sensorMiniRow}>
+                  <span style={styles.sensorMiniKey}>Gyro Activity</span>
+                  <span style={styles.sensorMiniVal}>{sensorActivityLive ? 'Live' : 'Waiting for movement'}</span>
+                </div>
               </div>
-              <div style={styles.sensorMiniRow}>
-                <span style={styles.sensorMiniKey}>Permissions</span>
-                <span style={styles.sensorMiniVal}>{sensorsEnabled ? 'Granted' : 'Not granted'}</span>
-              </div>
-              <div style={styles.sensorMiniRow}>
-                <span style={styles.sensorMiniKey}>Gyro Activity</span>
-                <span style={styles.sensorMiniVal}>{sensorActivityLive ? 'Live' : 'Waiting for movement'}</span>
-              </div>
-            </div>}
+            )}
 
             {statusMsg && <div style={styles.status}>{statusMsg}</div>}
 
