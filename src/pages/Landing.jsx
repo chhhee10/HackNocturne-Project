@@ -85,7 +85,7 @@ export default function Landing() {
           {[
             { title: 'Behavioural DNA', desc: 'Keystroke timing + mouse dynamics. 64-dimensional vector unique to you. No biometric stored anywhere.', tag: 'Float32Array[64]', tagColor: '#00d4ff' },
             { title: 'Ethereum Trust Layer', desc: 'Every auth event, failed attempt, and duress trigger logged permanently on Sepolia. Immutable. Public. Forever.', tag: 'keccak256 · Sepolia', tagColor: '#00d4ff' },
-            { title: 'Anti-Coercion Protocol', desc: 'Stress signature detected in rhythm. Ghost session loads. Real account locks silently. Blockchain records the attack.', tag: 'DuressActivated · on-chain', tagColor: '#ff6b35' },
+            { title: 'Anti-Coercion Protocol', desc: 'Stress signature detected in rhythm. Ghost session loads.Blockchain records the attack.', tag: 'DuressActivated · on-chain', tagColor: '#ff6b35' },
           ].map(card => (
             <div key={card.title} style={s.card}>
               <div style={s.cardTopEdge} />
