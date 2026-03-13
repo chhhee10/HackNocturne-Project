@@ -10,7 +10,7 @@ const PHRASE = 'Secure my account';
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { enrollmentVector, enrollmentKeystroke, walletAddress, isEnrolled, setIsDuressMode, setLastAuthScore, addEtherscanLink, demoMode } = useVaultless();
+  const { enrollmentVector, enrollmentKeystroke, enrollmentMouse, walletAddress, isEnrolled, setIsDuressMode, setLastAuthScore, addEtherscanLink, demoMode } = useVaultless();
 
   const [phase, setPhase] = useState('ready'); // ready | typing | scoring | result
   const [currentInput, setCurrentInput] = useState('');
@@ -65,14 +65,14 @@ export default function Auth() {
     const liveVector = buildCombinedVector(kData, mData);
 
     // Always compute a real similarity score (even in demo mode) so the demo behaves like the real engine.
-    let simScore = cosineSimilarity(liveVector, enrollmentVector, kData, enrollmentKeystroke, mData, null);
+    let simScore = cosineSimilarity(liveVector, enrollmentVector, kData, enrollmentKeystroke, mData, enrollmentMouse || null);
     if (demoMode) {
       // Add minimal noise so it still feels like a demo, but keep the same underlying behavior.
       simScore = Math.min(0.99, Math.max(0.01, simScore + (Math.random() * 0.02 - 0.01)));
     }
 
     const isStress = detectStress(kData, enrollmentKeystroke);
-    const classification = classifyScore(simScore);
+    const classification = classifyScore(simScore, isStress);
 
     // Stress indicator (0–100) - use deterministic calculation in demo mode for consistency
     const stressVal = isStress ? 85 + Math.random() * 15 : Math.max(0, (0.85 - simScore) * 200);
