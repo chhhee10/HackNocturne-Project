@@ -13,7 +13,7 @@ const FAKE_EMAILS = [
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { lastAuthScore, etherscanLinks, walletAddress, demoMode } = useVaultless();
+  const { lastAuthScore, etherscanLinks, walletAddress, demoMode, clearEnrollment } = useVaultless();
 
   return (
     <div style={styles.root}>
@@ -100,6 +100,9 @@ export default function Dashboard() {
           <button style={styles.logoutBtn} onClick={() => navigate('/gmail')}>
             Sign Out
           </button>
+          <button style={styles.reenrollBtn} onClick={() => { clearEnrollment(); navigate('/enroll'); }}>
+            Re-enroll Identity
+          </button>
           {demoMode && (
             <button style={styles.duressTestBtn} onClick={() => navigate('/auth')}>
               Test Duress →
@@ -146,5 +149,6 @@ const styles = {
   eventTime: { color: '#444', fontSize: 10 },
   panelFooter: { marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8 },
   logoutBtn: { background: 'transparent', border: '1px solid #222', color: '#555', padding: '8px', fontSize: 11, cursor: 'pointer', borderRadius: 4, letterSpacing: 1, fontFamily: "'Courier New', monospace" },
+  reenrollBtn: { background: 'transparent', border: '1px solid #ff444433', color: '#ff6666', padding: '8px', fontSize: 11, cursor: 'pointer', borderRadius: 4, letterSpacing: 1, fontFamily: "'Courier New', monospace" },
   duressTestBtn: { background: '#ffaa0022', border: '1px solid #ffaa0044', color: '#ffaa00', padding: '8px', fontSize: 11, cursor: 'pointer', borderRadius: 4, letterSpacing: 1, fontFamily: "'Courier New', monospace" },
 };

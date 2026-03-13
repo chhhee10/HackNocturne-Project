@@ -112,12 +112,35 @@ export default function Enroll() {
     return avg;
   };
 
+  // Average all scalar fields AND array fields (holdTimes, flightTimes) across samples
+  const averageKeystroke = (samples) => {
+    const scalar = (key) => samples.reduce((sum, s) => sum + (s[key] || 0), 0) / samples.length;
+    const avgArr = (key) => {
+      const maxLen = Math.max(...samples.map(s => (s[key] || []).length));
+      return Array.from({ length: maxLen }, (_, i) => {
+        const vals = samples.map(s => (s[key] || [])[i]).filter(v => v !== undefined);
+        return vals.reduce((a, b) => a + b, 0) / vals.length;
+      });
+    };
+    return {
+      avgHoldTime:    scalar('avgHoldTime'),
+      stdHoldTime:    scalar('stdHoldTime'),
+      avgFlightTime:  scalar('avgFlightTime'),
+      stdFlightTime:  scalar('stdFlightTime'),
+      totalDuration:  scalar('totalDuration'),
+      rhythmVariance: scalar('rhythmVariance'),
+      errorRate:      scalar('errorRate'),
+      holdTimes:      avgArr('holdTimes'),
+      flightTimes:    avgArr('flightTimes'),
+    };
+  };
+
   const commitToChain = async (sampleList) => {
     setPhase('processing');
     setStatusMsg('Averaging 3 samples into Behavioural DNA...');
 
     const finalVector = avgVector(sampleList);
-    const avgKeystroke = sampleList[sampleList.length - 1].keystroke;
+    const avgKeystroke = averageKeystroke(sampleList.map(s => s.keystroke));
     const hash = vectorToHash(finalVector);
 
     setEnrollmentVector(finalVector);

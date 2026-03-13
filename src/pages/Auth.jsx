@@ -68,7 +68,7 @@ export default function Auth() {
       // Simulate by adding random noise
       simScore = 0.89 + (Math.random() * 0.08 - 0.04); // normal: ~0.87-0.97
     } else {
-      simScore = cosineSimilarity(liveVector, enrollmentVector);
+      simScore = cosineSimilarity(liveVector, enrollmentVector, kData, enrollmentKeystroke, mData, null);
     }
 
     const isStress = demoMode ? false : detectStress(kData, enrollmentKeystroke);

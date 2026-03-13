@@ -1,18 +1,81 @@
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useEffect } from 'react';
 
 const VaultlessContext = createContext(null);
 
+// Float32Array can't be JSON.stringify'd directly — convert to/from plain array
+function serializeVector(v) {
+  return v ? Array.from(v) : null;
+}
+function deserializeVector(v) {
+  return v ? new Float32Array(v) : null;
+}
+
+function loadFromStorage() {
+  try {
+    const raw = localStorage.getItem('vaultless_enrollment');
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    return {
+      enrollmentVector:    deserializeVector(data.enrollmentVector),
+      enrollmentKeystroke: data.enrollmentKeystroke || null,
+      walletAddress:       data.walletAddress || null,
+      isEnrolled:          data.isEnrolled || false,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function saveToStorage({ enrollmentVector, enrollmentKeystroke, walletAddress, isEnrolled }) {
+  try {
+    localStorage.setItem('vaultless_enrollment', JSON.stringify({
+      enrollmentVector:    serializeVector(enrollmentVector),
+      enrollmentKeystroke: enrollmentKeystroke,
+      walletAddress:       walletAddress,
+      isEnrolled:          isEnrolled,
+    }));
+  } catch (e) {
+    console.error('[VAULTLESS] Failed to persist enrollment:', e);
+  }
+}
+
 export function VaultlessProvider({ children }) {
-  const [enrollmentVector, setEnrollmentVector] = useState(null);
-  const [enrollmentKeystroke, setEnrollmentKeystroke] = useState(null);
-  const [walletAddress, setWalletAddress] = useState(null);
-  const [isEnrolled, setIsEnrolled] = useState(false);
-  const [isDuressMode, setIsDuressMode] = useState(false);
+  const saved = loadFromStorage();
+
+  const [enrollmentVector,    setEnrollmentVectorRaw]    = useState(saved?.enrollmentVector    || null);
+  const [enrollmentKeystroke, setEnrollmentKeystrokeRaw] = useState(saved?.enrollmentKeystroke || null);
+  const [walletAddress,       setWalletAddressRaw]       = useState(saved?.walletAddress       || null);
+  const [isEnrolled,          setIsEnrolledRaw]          = useState(saved?.isEnrolled          || false);
+
+  const [isDuressMode,  setIsDuressMode]  = useState(false);
   const [lastAuthScore, setLastAuthScore] = useState(null);
   const [etherscanLinks, setEtherscanLinks] = useState([]);
   const [demoMode, setDemoMode] = useState(
     import.meta.env.VITE_DEMO_MODE === 'true'
   );
+
+  // Wrap setters to also persist whenever enrollment data changes
+  const setEnrollmentVector = (v) => {
+    setEnrollmentVectorRaw(v);
+  };
+  const setEnrollmentKeystroke = (v) => {
+    setEnrollmentKeystrokeRaw(v);
+  };
+  const setWalletAddress = (v) => {
+    setWalletAddressRaw(v);
+  };
+  const setIsEnrolled = (v) => {
+    setIsEnrolledRaw(v);
+  };
+
+  // Persist to localStorage whenever any enrollment field changes
+  useEffect(() => {
+    if (isEnrolled && enrollmentVector && enrollmentKeystroke) {
+      saveToStorage({ enrollmentVector, enrollmentKeystroke, walletAddress, isEnrolled });
+      console.log('[VAULTLESS] Enrollment persisted to localStorage');
+      console.log('[VAULTLESS] Stored holdTimes:', enrollmentKeystroke.holdTimes?.length, 'flightTimes:', enrollmentKeystroke.flightTimes?.length);
+    }
+  }, [enrollmentVector, enrollmentKeystroke, walletAddress, isEnrolled]);
 
   const addEtherscanLink = (label, txHash) => {
     setEtherscanLinks(prev => [...prev, {
@@ -22,16 +85,25 @@ export function VaultlessProvider({ children }) {
     }]);
   };
 
+  const clearEnrollment = () => {
+    localStorage.removeItem('vaultless_enrollment');
+    setEnrollmentVectorRaw(null);
+    setEnrollmentKeystrokeRaw(null);
+    setWalletAddressRaw(null);
+    setIsEnrolledRaw(false);
+  };
+
   return (
     <VaultlessContext.Provider value={{
-      enrollmentVector, setEnrollmentVector,
+      enrollmentVector,    setEnrollmentVector,
       enrollmentKeystroke, setEnrollmentKeystroke,
-      walletAddress, setWalletAddress,
-      isEnrolled, setIsEnrolled,
-      isDuressMode, setIsDuressMode,
-      lastAuthScore, setLastAuthScore,
-      etherscanLinks, addEtherscanLink,
-      demoMode, setDemoMode,
+      walletAddress,       setWalletAddress,
+      isEnrolled,          setIsEnrolled,
+      isDuressMode,        setIsDuressMode,
+      lastAuthScore,       setLastAuthScore,
+      etherscanLinks,      addEtherscanLink,
+      demoMode,            setDemoMode,
+      clearEnrollment,
     }}>
       {children}
     </VaultlessContext.Provider>

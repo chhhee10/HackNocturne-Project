@@ -1,5 +1,8 @@
 import { useState, useRef, useCallback } from 'react';
 
+// The phrase — must match exactly what's used in Enroll/Auth
+const PHRASE = 'Secure my account';
+
 // ─── Keystroke DNA Hook ───────────────────────────────────────────────────────
 export function useKeystrokeDNA() {
   const [events, setEvents] = useState([]);
@@ -40,25 +43,37 @@ export function useKeystrokeDNA() {
   }, []);
 
   const extractVector = useCallback(() => {
-    const evts = rawEvents.current;
-    if (evts.length < 3) return null;
+    // Exclude backspace from timing analysis — only count real phrase keys
+    const allEvts = rawEvents.current;
+    const evts = allEvts.filter(e => e.key !== 'Backspace' && e.key !== 'Shift');
+    if (evts.length < 5) return null;
 
-    const holdTimes = evts.map(e => e.holdTime);
-    const flightTimes = evts.filter(e => e.flightTime > 0).map(e => e.flightTime);
+    const holdTimes   = evts.map(e => e.holdTime);
+    const flightTimes = evts.slice(1).map(e => e.flightTime).filter(f => f > 0 && f < 3000);
+
     const totalDuration = evts.length > 1
       ? evts[evts.length - 1].timestamp - evts[0].timestamp
       : 0;
-    const errorRate = evts.filter(e => e.key === 'Backspace').length / evts.length;
+
+    const errorCount = allEvts.filter(e => e.key === 'Backspace').length;
 
     return {
-      avgHoldTime: mean(holdTimes),
-      stdHoldTime: std(holdTimes),
-      avgFlightTime: mean(flightTimes),
-      stdFlightTime: std(flightTimes),
+      // Scalar summaries
+      avgHoldTime:    mean(holdTimes),
+      stdHoldTime:    std(holdTimes),
+      avgFlightTime:  mean(flightTimes),
+      stdFlightTime:  std(flightTimes),
       totalDuration,
-      rhythmVariance: std(flightTimes),
-      errorRate,
-      holdTimes: holdTimes.slice(0, 20), // per-key signature
+      rhythmVariance: variance(flightTimes),
+      errorRate:      errorCount / allEvts.length,
+
+      // Raw arrays — these are the actual fingerprint
+      holdTimes,
+      flightTimes,
+
+      // Z-score normalized arrays — shape of pattern, independent of speed
+      holdTimesZ:   zNormalize(holdTimes),
+      flightTimesZ: zNormalize(flightTimes),
     };
   }, []);
 
@@ -107,8 +122,6 @@ export function useMouseDNA() {
     setActive(true);
   }, []);
 
-  const stopCapture = useCallback(() => setActive(false), []);
-
   const reset = useCallback(() => {
     points.current = [];
     lastPoint.current = null;
@@ -119,44 +132,37 @@ export function useMouseDNA() {
   const extractVector = useCallback(() => {
     const pts = points.current;
     if (pts.length < 5) return null;
-
     const velocities = pts.map(p => p.velocity);
     const angles = pts.map(p => p.angle);
-
-    // direction changes
     let dirChanges = 0;
     for (let i = 1; i < angles.length; i++) {
       if (Math.abs(angles[i] - angles[i - 1]) > 0.5) dirChanges++;
     }
-
     return {
-      avgVelocity: mean(velocities),
+      avgVelocity:      mean(velocities),
       velocityVariance: std(velocities),
-      avgAcceleration: meanAcceleration(velocities),
+      avgAcceleration:  meanAcceleration(velocities),
       directionChanges: dirChanges / Math.max(pts.length, 1),
-      avgClickHold: mean(clickHolds.current),
+      avgClickHold:     mean(clickHolds.current),
     };
   }, []);
 
-  return { onMouseMove, onMouseDown, onMouseUp, startCapture, stopCapture, reset, extractVector };
+  return { onMouseMove, onMouseDown, onMouseUp, startCapture, reset, extractVector };
 }
 
-// ─── Combined Vector & Similarity ────────────────────────────────────────────
+// ─── Vector builder (for on-chain hashing only) ───────────────────────────────
 export function buildCombinedVector(keystroke, mouse) {
-  // Keystroke features (10 base + 20 per-key = 30 dims)
   const kFeatures = [
     norm(keystroke.avgHoldTime, 0, 500),
     norm(keystroke.stdHoldTime, 0, 200),
     norm(keystroke.avgFlightTime, 0, 800),
     norm(keystroke.stdFlightTime, 0, 400),
     norm(keystroke.totalDuration, 0, 15000),
-    norm(keystroke.rhythmVariance, 0, 400),
+    norm(Math.sqrt(keystroke.rhythmVariance || 0), 0, 100),
     norm(keystroke.errorRate, 0, 0.5),
-    0, 0, 0, // padding
-    ...padOrTrim(keystroke.holdTimes.map(h => norm(h, 0, 500)), 20),
+    0, 0, 0,
+    ...padOrTrim((keystroke.holdTimes || []).map(h => norm(h, 0, 500)), 20),
   ];
-
-  // Mouse features (5 dims, padded to 34)
   const mFeatures = mouse ? [
     norm(mouse.avgVelocity, 0, 5),
     norm(mouse.velocityVariance, 0, 3),
@@ -165,45 +171,146 @@ export function buildCombinedVector(keystroke, mouse) {
     norm(mouse.avgClickHold, 0, 1000),
     ...new Array(29).fill(0),
   ] : new Array(34).fill(0);
-
-  return new Float32Array([...kFeatures, ...mFeatures]); // 64 dims
+  return new Float32Array([...kFeatures, ...mFeatures]);
 }
 
-export function cosineSimilarity(a, b) {
-  if (!a || !b || a.length !== b.length) return 0;
-  let dot = 0, normA = 0, normB = 0;
-  for (let i = 0; i < a.length; i++) {
-    dot += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
+// ─── Main similarity function ─────────────────────────────────────────────────
+// Takes the rich keystroke objects — not just the flat vectors.
+// Returns 0.0–1.0 where 1.0 = identical pattern.
+export function cosineSimilarity(
+  _liveVec, _enrollVec,          // kept for API compat, not used
+  liveK, enrollK,                // keystroke objects — the real input
+  _liveM, _enrollM               // mouse objects — future use
+) {
+  // Fallback to scalar-only comparison if arrays missing (shouldn't happen after fix)
+  if (!liveK || !enrollK) {
+    console.warn('[VAULTLESS] Missing keystroke objects — falling back to scalar comparison');
+    return 0.3; // force fail so it's obvious something is wrong
   }
-  if (normA === 0 || normB === 0) return 0;
-  return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+
+  const liveHZ   = liveK.holdTimesZ   || zNormalize(liveK.holdTimes   || []);
+  const enrollHZ = enrollK.holdTimesZ || zNormalize(enrollK.holdTimes  || []);
+  const liveFZ   = liveK.flightTimesZ || zNormalize(liveK.flightTimes  || []);
+  const enrollFZ = enrollK.flightTimesZ || zNormalize(enrollK.flightTimes || []);
+
+  // --- Score 1: Z-score pattern match on hold times (WHO you are — key identity) ---
+  // Two different people will have different shaped hold-time profiles even at same speed
+  const holdPatternScore = pearsonCorrelation(liveHZ, enrollHZ);
+
+  // --- Score 2: Z-score pattern match on flight times (RHYTHM between keys) ---
+  const flightPatternScore = pearsonCorrelation(liveFZ, enrollFZ);
+
+  // --- Score 3: Hold time ratio consistency (speed-normalized key-by-key match) ---
+  // Checks if each individual key hold time is proportionally similar
+  const holdRatioScore = ratioSimilarity(liveK.holdTimes || [], enrollK.holdTimes || []);
+
+  // --- Score 4: Total duration ratio (overall speed similarity) ---
+  const durScore = safeDivRatio(liveK.totalDuration, enrollK.totalDuration);
+
+  // Convert correlations from [-1, 1] to [0, 1]
+  const hpNorm  = (holdPatternScore   + 1) / 2;
+  const fpNorm  = (flightPatternScore + 1) / 2;
+
+  // Weights: pattern shape matters most, then hold ratios, then overall speed
+  const score = (
+    hpNorm        * 0.40 +  // shape of hold pattern
+    fpNorm        * 0.30 +  // shape of flight/rhythm pattern
+    holdRatioScore * 0.20 + // per-key hold ratio consistency
+    durScore      * 0.10    // overall speed match
+  );
+
+  console.log('[VAULTLESS AUTH DEBUG]');
+  console.log('  Hold pattern (Pearson):', holdPatternScore.toFixed(3), '→ normalized:', hpNorm.toFixed(3));
+  console.log('  Flight pattern (Pearson):', flightPatternScore.toFixed(3), '→ normalized:', fpNorm.toFixed(3));
+  console.log('  Hold ratio score:', holdRatioScore.toFixed(3));
+  console.log('  Duration score:', durScore.toFixed(3));
+  console.log('  FINAL SCORE:', score.toFixed(3));
+  console.log('  Live holdTimes:', liveK.holdTimes?.slice(0,5).map(n=>n.toFixed(0)));
+  console.log('  Enroll holdTimes:', enrollK.holdTimes?.slice(0,5).map(n=>n.toFixed(0)));
+  console.log('  Live flightTimes:', liveK.flightTimes?.slice(0,5).map(n=>n.toFixed(0)));
+  console.log('  Enroll flightTimes:', enrollK.flightTimes?.slice(0,5).map(n=>n.toFixed(0)));
+
+  return Math.max(0, Math.min(1, score));
 }
 
-export function detectStress(liveKeystroke, enrollmentKeystroke) {
-  if (!liveKeystroke || !enrollmentKeystroke) return false;
-  const baseVariance = enrollmentKeystroke.rhythmVariance || 1;
-  const liveVariance = liveKeystroke.rhythmVariance || 0;
-  return liveVariance > baseVariance * 2;
+export function detectStress(liveK, enrollK) {
+  if (!liveK || !enrollK) return false;
+  const baseVariance = enrollK.rhythmVariance || 1;
+  const liveVariance = liveK.rhythmVariance   || 0;
+  return liveVariance > baseVariance * 2.5;
 }
 
 export function classifyScore(score, isStress) {
-  if (score > 0.85 && !isStress) return 'authenticated';
-  if (score >= 0.55 || isStress) return 'duress';
+  if (score > 0.80 && !isStress) return 'authenticated';
+  if (score >= 0.52 || isStress) return 'duress';
   return 'rejected';
 }
 
-// ─── Math Utilities ───────────────────────────────────────────────────────────
+// ─── Statistical helpers ──────────────────────────────────────────────────────
+
+// Pearson correlation: measures similarity of shape/pattern, ignores scale
+// Returns -1 (opposite) to +1 (identical pattern)
+function pearsonCorrelation(a, b) {
+  const len = Math.min(a.length, b.length);
+  if (len < 3) return 0;
+  const as = a.slice(0, len);
+  const bs = b.slice(0, len);
+  const ma = mean(as), mb = mean(bs);
+  let num = 0, da = 0, db = 0;
+  for (let i = 0; i < len; i++) {
+    const ai = as[i] - ma;
+    const bi = bs[i] - mb;
+    num += ai * bi;
+    da  += ai * ai;
+    db  += bi * bi;
+  }
+  if (da === 0 || db === 0) return 0;
+  return num / Math.sqrt(da * db);
+}
+
+// Z-score normalize an array (mean=0, std=1)
+// This lets us compare shape/pattern regardless of absolute speed
+function zNormalize(arr) {
+  if (!arr || arr.length < 2) return arr || [];
+  const m = mean(arr);
+  const s = std(arr);
+  if (s === 0) return arr.map(() => 0);
+  return arr.map(v => (v - m) / s);
+}
+
+// Ratio similarity: how close is each pair of values relative to each other
+// [100, 200, 150] vs [110, 210, 160] → high (same proportions)
+// [100, 200, 150] vs [200, 100, 150] → low (different per-key profile)
+function ratioSimilarity(a, b) {
+  const len = Math.min(a.length, b.length, 16);
+  if (len === 0) return 0.5;
+  let total = 0;
+  for (let i = 0; i < len; i++) {
+    const ai = Math.max(a[i], 1);
+    const bi = Math.max(b[i], 1);
+    total += Math.min(ai, bi) / Math.max(ai, bi);
+  }
+  return total / len;
+}
+
+function safeDivRatio(a, b) {
+  if (!a || !b || a === 0 || b === 0) return 0.5;
+  return Math.min(a, b) / Math.max(a, b);
+}
+
 function mean(arr) {
   if (!arr || arr.length === 0) return 0;
   return arr.reduce((a, b) => a + b, 0) / arr.length;
 }
 
-function std(arr) {
+function variance(arr) {
   if (!arr || arr.length < 2) return 0;
   const m = mean(arr);
-  return Math.sqrt(arr.reduce((acc, v) => acc + (v - m) ** 2, 0) / arr.length);
+  return arr.reduce((acc, v) => acc + (v - m) ** 2, 0) / arr.length;
+}
+
+function std(arr) {
+  return Math.sqrt(variance(arr));
 }
 
 function meanAcceleration(velocities) {
