@@ -176,7 +176,7 @@ export function useMouseDNA() {
       // Clamp extreme spikes to reduce outlier impact
       if (velocity > 5) velocity = 5;
       const angle = Math.atan2(dy, dx);
-      points.current.push({ velocity, angle, dt, pressure });
+      points.current.push({ velocity, angle, dt, pressure, isTouch });
       // Keep a bounded history so long sessions don't explode in size
       if (points.current.length > 512) {
         points.current.shift();
@@ -565,11 +565,13 @@ export function useMouseDNA() {
       // Touch and motion
       avgTouchPressure,
       stdTouchPressure,
+      pointCount: pts.length,
       touchPointCount: touchPoints.length,
       avgAccelMag,
       stdAccelMag,
       avgGyroMag,
       stdGyroMag,
+      capturePlatform: diagnosticsRef.current.platform || 'unknown',
 
       // Raw arrays – richer Gesture DNA for future use
       velocities,
@@ -673,7 +675,7 @@ export function cosineSimilarity(
   // Mouse / gesture component — only if we have enrollment data for it
   let mouseScore = null;
   let mobileConfidence = 1;
-  if (liveM && enrollM) {
+  if (hasReliablePointerSample(liveM) && hasReliablePointerSample(enrollM)) {
     const liveVelZ   = liveM.velocitiesZ   || zNormalize(liveM.velocities   || []);
     const enrollVelZ = enrollM.velocitiesZ || zNormalize(enrollM.velocities || []);
     const liveAngZ   = liveM.angleDiffsZ   || zNormalize(liveM.angleDiffs   || []);
@@ -696,8 +698,12 @@ export function cosineSimilarity(
       clickRatio  * 0.20   // click-down behaviour
     );
     // Add mobile/touch-specific features if both enrollment and live data have them.
-    const hasTouchData = (liveM.touchPointCount || 0) > 5 && (enrollM.touchPointCount || 0) > 5;
-    const hasMotionData = (liveM.avgGyroMag || 0) > 0 && (enrollM.avgGyroMag || 0) > 0;
+    const liveIsMobile = isMobileBehaviorSample(liveM);
+    const enrollIsMobile = isMobileBehaviorSample(enrollM);
+    const matchedMobileCapture = liveIsMobile && enrollIsMobile;
+    const hasTouchData = matchedMobileCapture && (liveM.touchPointCount || 0) > 5 && (enrollM.touchPointCount || 0) > 5;
+    const hasMotionData = matchedMobileCapture && (liveM.avgGyroMag || 0) > 0 && (enrollM.avgGyroMag || 0) > 0;
+
     if (hasTouchData || hasMotionData) {
       const touchPressureScore = ratioSimilarity(
         [liveM.avgTouchPressure || 0],
@@ -717,7 +723,7 @@ export function cosineSimilarity(
     // fully rejecting so genuine users can still pass with solid captures.
     const enrollTouchPoints = enrollM.touchPointCount || 0;
     const liveTouchPoints = liveM.touchPointCount || 0;
-    const hasMobileEnrollment = enrollTouchPoints > 5 || (enrollM.avgGyroMag || 0) > 0;
+    const hasMobileEnrollment = matchedMobileCapture && (enrollTouchPoints > 5 || (enrollM.avgGyroMag || 0) > 0);
 
     if (hasMobileEnrollment) {
       const touchCoverage = clamp01(safeDiv(liveTouchPoints, Math.max(enrollTouchPoints, 12)));
@@ -876,6 +882,18 @@ function norm(val, min, max) {
 
 function clamp01(value) {
   return Math.min(1, Math.max(0, value));
+}
+
+function hasReliablePointerSample(sample) {
+  if (!sample) return false;
+  const pointCount = sample.pointCount || sample.velocities?.length || 0;
+  return pointCount >= 8;
+}
+
+function isMobileBehaviorSample(sample) {
+  if (!sample) return false;
+  if (sample.capturePlatform === 'ios' || sample.capturePlatform === 'android') return true;
+  return (sample.touchPointCount || 0) > 5 || (sample.avgGyroMag || 0) > 0 || (sample.avgAccelMag || 0) > 0;
 }
 
 function padOrTrim(arr, len) {
