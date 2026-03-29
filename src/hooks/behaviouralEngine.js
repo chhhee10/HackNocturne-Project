@@ -627,7 +627,7 @@ export function buildCombinedVector(keystroke, mouse) {
     norm(mouse.avgClickHold, 0, 1000),
     norm(mouse.avgTouchPressure || 0, 0, 1),
     norm(mouse.stdTouchPressure || 0, 0, 0.5),
-    norm(mouse.touchPointCount || 0, 0, 100),
+    norm(mouse.touchPointCount || 0, 0, 100),//Mouse movement tracker
     norm(mouse.avgAccelMag || 0, 0, 20),
     norm(mouse.stdAccelMag || 0, 0, 10),
     norm(mouse.avgGyroMag || 0, 0, 10),
